@@ -1,0 +1,111 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- ============================ SETTINGS ============================= -->
+
+    <!-- Node frequency: the frequency [Hz] which rate.sleep() function will
+    attempt to maintain in the main_loop. -->
+    <arg 
+    name="node_frequency" 
+    default="200"/>
+
+    <!-- If set to "true" enable rosbag recording of nodes' outputs. -->
+    <arg 
+    name="enable_rosbag_recording" 
+    default="false"/>
+
+    <!-- ======================== END OF SETTINGS ========================== -->
+
+
+    <!-- Active neck: -->
+    <node 
+    pkg="active_neck" 
+    type="active_neck.py" 
+    name="active_neck" 
+    output="screen">
+        <param 
+        name="node_frequency" 
+        value="$(arg node_frequency)"/>
+    </node>
+
+    <!-- Pitch PID controller: -->
+    <node 
+    pkg="pid" 
+    type="controller" 
+    name="controller" 
+    ns="/pitch_motor_pid" 
+    output="log">
+        <param
+        name="Kp"
+        value="0.0075"/>
+        <param 
+        name="Ki"
+        value="0.0"/>
+        <param 
+        name="Kd"
+        value="0.0"/>
+        <param 
+        name="upper_limit"
+        value="1.0"/>
+        <param 
+        name="lower_limit"
+        value="-1.0"/>
+        <param
+        name="min_loop_frequency"
+        value="100.0"/>
+        <param 
+        name="max_loop_frequency"
+        value="100.0"/>  
+    </node>
+
+
+    <!-- Yaw PID controller: -->
+    <node 
+    pkg="pid" 
+    type="controller" 
+    name="controller" 
+    ns="/yaw_motor_pid" 
+    output="log">
+        <param
+        name="Kp"
+        value="0.0075"/>
+        <param 
+        name="Ki"
+        value="0.0"/>
+        <param 
+        name="Kd"
+        value="0.0"/>
+        <param 
+        name="upper_limit"
+        value="1.0"/>
+        <param 
+        name="lower_limit"
+        value="-1.0"/>
+        <param
+        name="min_loop_frequency"
+        value="100.0"/>
+        <param 
+        name="max_loop_frequency"
+        value="100.0"/>  
+    </node>
+
+    <!-- Rosbag: -->
+    <group if="$(arg enable_rosbag_recording)">
+        <node 
+        pkg="rosbag" 
+        type="record" 
+        name="rosbag"
+        ns="/headset_feedback"
+        output="screen"
+        args="
+        /headset_feedback/is_initialized
+        /headset_feedback/pose
+        -o $(find oculus_ros)/bagfiles/headset_feedback/
+        ">
+        </node>    
+    </group>
+
+    <!-- rqt_plot is a resource hog, so if you're seeing high CPU usage, don't launch it  -->
+    <!-- <node name="rqt_plot" pkg="rqt_plot" type="rqt_plot"/>
+
+    <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" />  -->
+</launch>
