@@ -25,7 +25,7 @@ The camera integration is managed using the [RealSense ROS package](https://gith
 
 ### Workflow
 1. The RealSense camera node communicates with the camera and publishes the image stream to a ROS topic.
-2. The image stream is received by the [`udp_ros` node](https://github.com/AlfaKeNTAvR/udp_ros).
+2. The image stream is received by the [`udp_ros`](https://github.com/AlfaKeNTAvR/udp_ros) node.
 3. The `udp_ros` node transmits the image stream to Unity using UDP.
 
 ---
