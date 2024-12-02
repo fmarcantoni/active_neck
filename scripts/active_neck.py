@@ -1,13 +1,12 @@
 #!/usr/bin/env python
-"""Implements 2-axis active neck control.
+"""
+Implements 2-axis active neck control to mirror the operator's head movements to the robot's reference frame.
 
 Author(s):
     1. Nikita Boguslavskii (bognik3@gmail.com), Human-Inspired Robotics (HiRo)
        lab, Worcester Polytechnic Institute (WPI), 2024.
     2. Filippo Marcantoni (fmarcantoni@wpi.edu), RBE, Worcester Polytechnic
        Institute (WPI), 2024.
-
-TODO:
 
 """
 
@@ -24,12 +23,10 @@ from std_msgs.msg import (
     Float64,
 )
 
-# # Third party messages and services:
-
-
 class ActiveNeck:
     """
-    
+    The ActiveNeck class uses the ROS PID package to implement two PID controllers, for pitch and yaw motors, to control the motors velocity 
+    to properly map the operator's headset movements to the robot's active neck.
     """
 
     def __init__(
@@ -37,11 +34,11 @@ class ActiveNeck:
         node_name,
     ):
         """
-        
+        The __init__ function intializes several constants related to the Dynamixel SDK, initialize motors and ports handler and parameters, 
+        and defines the necessary ROS Publishers and Subscribers to use the PID controllers.
         """
 
-        # # Private CONSTANTS:
-        # NOTE: By default all new class CONSTANTS should be private.
+        # Initializes several constants related to the Dynamixel SDK
         self.__NODE_NAME = node_name
 
         # Control table address:
@@ -87,25 +84,16 @@ class ActiveNeck:
         self.PUBLIC_CONTANT = 1
 
         # # Private variables:
-        # NOTE: By default all new class variables should be private.
+        # Initializes the port handler and packet handler which will be used to intialize the port and motors.
         self.__device_name = '/dev/ttyUSB0'
         self.__port_handler = PortHandler(self.__device_name)
         self.__packet_handler = PacketHandler(self.__PROTOCOL_VERSION)
 
+        # Checking flags to see if port and motors are ready, and a dictionary to check if the axis limits are reached.
         self.__port_is_ready = False
         self.__motor_is_ready = {
             'pitch': False,
             'yaw': False,
-        }
-
-        self.__current_velocity_fraction = {
-            'pitch': 0.0,
-            'yaw': 0.0,
-        }
-
-        self.__current_position_deg = {
-            'pitch': 0.0,
-            'yaw': 0.0,
         }
 
         self.__limit_status = {
@@ -117,6 +105,17 @@ class ActiveNeck:
                 'lower': False,
                 'upper': False,
             }
+        }
+
+        # Dictionaries used to keep track of current velocity, position and target velocity.
+        self.__current_velocity_fraction = {
+            'pitch': 0.0,
+            'yaw': 0.0,
+        }
+
+        self.__current_position_deg = {
+            'pitch': 0.0,
+            'yaw': 0.0,
         }
 
         self.__target_velocity_fraction = {
@@ -131,43 +130,17 @@ class ActiveNeck:
         self.__is_initialized = False
         self.__dependency_initialized = False
 
+        # Defines __node_is_initialized publisher which will publish to the topic is_initialized if the system is ready to run or not.
         self.__node_is_initialized = rospy.Publisher(
             f'{self.__NODE_NAME}/is_initialized',
             Bool,
             queue_size=1,
         )
 
-        # NOTE: Specify dependency initial False initial status.
         self.__dependency_status = {}
-
-        # self.__dependency_status['<dependency_node_name>'] = False
-
-        # NOTE: Specify dependency is_initialized topic (or any other topic,
-        # which will be available when the dependency node is running properly).
         self.__dependency_status_topics = {}
 
-        # self.__dependency_status_topics['<dependency_node_name>'] = (
-        #     rospy.Subscriber(
-        #         f'/<dependency_node_name>/is_initialized',
-        #         Bool,
-        #         self.__<dependency_name>_callback,
-        #     )
-        # )
-
-        # # Service provider:
-        # rospy.Service(
-        #     f'{self.__NODE_NAME}/<service_name1>',
-        #     SetBool,
-        #     self.__service_name1_handler,
-        # )
-
-        # # Service subscriber:
-        # self.__service = rospy.ServiceProxy(
-        #     '/<service_name2>',
-        #     ServiceType2,
-        # )
-
-        # # Topic publisher:
+        # # Publishers that publish the motors state/position in degrees to calculate the appropriate velocity by the PID controllers.
         self.__pitch_state = rospy.Publisher(
             '/pitch_motor_pid/state',
             Float64,
@@ -179,18 +152,7 @@ class ActiveNeck:
             queue_size=1,
         )
 
-        # # Topic subscriber:
-        rospy.Subscriber(
-            f'{self.__NODE_NAME}/pitch_velocity_fraction',
-            Float64,
-            self.__pitch_velocity_fraction_callback,
-        )
-        rospy.Subscriber(
-            f'{self.__NODE_NAME}/yaw_velocity_fraction',
-            Float64,
-            self.__yaw_velocity_fraction_callback,
-        )
-
+        # # Subscribers that subscribe to the control_effort topics which will indicate the target velocity.
         rospy.Subscriber(
             '/pitch_motor_pid/control_effort',
             Float64,
@@ -202,37 +164,18 @@ class ActiveNeck:
             self.__yaw_velocity_fraction_callback,
         )
 
-        # # Timers:
+        # # Timer used to alternate the reading of the current position of the motors and writing the target velocity to the motors. 
         rospy.Timer(
             rospy.Duration(1.0 / 200),
             self.__read_write_timer,
         )
 
-    # # Dependency status callbacks:
-    # NOTE: each dependency topic should have a callback function, which will
-    # set __dependency_status variable.
-    # def __dependency_name_callback(self, message):
-    #     """Monitors /<node_name>/is_initialized topic.
+    # # Topics Callback Functions: used to set the motors to the target velocity.
 
-    #     """
-
-    #     # self.__dependency_status['dependency_node_name'] = message.data
-
-    # # Service handlers:
-    # def __service_name1_handler(self, request):
-    #     """
-
-    #     """
-
-    #     success = True
-    #     message = ''
-
-    #     return success, message
-
-    # # Topic callbacks:
     def __pitch_velocity_fraction_callback(self, message):
         """
-
+        Callback function of the '/pitch_motor_pid/control_effort' topic, extracts the velocity fraction calculated by the pitch PID controller, 
+        checks the error between the current and target velocity, and if it's larger than a certain tolerance it sets the __current_velocity_fraction and the __target_velocity_fraction for the pitch motor.
         """
 
         target_velocity_fraction = message.data
@@ -248,7 +191,8 @@ class ActiveNeck:
 
     def __yaw_velocity_fraction_callback(self, message):
         """
-
+        Callback function of the '/yaw_motor_pid/control_effort' topic, extracts the velocity fraction calculated by the yaw PID controller, 
+        checks the error between the current and target velocity, and if it's larger than a certain tolerance it sets the __current_velocity_fraction and the __target_velocity_fraction for the yaw motor.
         """
 
         target_velocity_fraction = message.data
@@ -262,11 +206,12 @@ class ActiveNeck:
             self.__target_velocity_fraction['yaw'] = target_velocity_fraction
             self.__current_velocity_fraction['yaw'] = target_velocity_fraction
 
-    # # Timer callbacks:
+    # # Timer callback function: reads the motors current positions and writes the motors target velocity.
 
     def __read_write_timer(self, event):
-        """Calls <some_function> on each timer callback with 100 Hz frequency.
-        
+        """
+        Calls <__read_current_position> and <__set_motor_velocity> on each timer callback with 200 Hz frequency. 
+        Manages when reading the motors current positions and when writing the motors target velocity.
         """
 
         if not self.__is_initialized or not self.__port_is_ready:
@@ -285,7 +230,7 @@ class ActiveNeck:
         )
 
     # # Private methods:
-    # NOTE: By default all new class methods should be private.
+
     def __check_initialization(self):
         """Monitors required criteria and sets is_initialized variable.
 
@@ -370,7 +315,7 @@ class ActiveNeck:
 
     def __initialize_port(self):
         """
-        
+        Using the PortHandler instance of the class, it opens the port device and sets the specified baud rate.
         """
 
         # Open port.
@@ -393,7 +338,7 @@ class ActiveNeck:
 
     def __initialize_motor(self, name, motor_id):
         """
-        
+        Using the PacketHandler instance of the class, it sets the operating mode to VELOCITY Mode and enables the Torque. 
         """
 
         rospy.loginfo(f"Initializing motor: {name} (ID: {motor_id})")
@@ -457,7 +402,7 @@ class ActiveNeck:
 
     def __set_motor_velocity(self, name, velocity_fraction):
         """
-        
+        Calculates the velocity to set the motors to, it writes the velocity, and checks that the axis limits are not reached.
         """
 
         motor = self.__MOTORS[name]
@@ -494,7 +439,7 @@ class ActiveNeck:
 
     def __read_current_position(self, name):
         """
-        
+        Read the current position of the motors and converts it in degrees.
         """
 
         motor = self.__MOTORS[name]
@@ -525,7 +470,7 @@ class ActiveNeck:
 
     def __check_axis_limits(self, name, current_position):
         """
-        
+        Checks that the current position of the motors is over the axis limits, if it is so, a flag is set to True and the velocity will be set to 0.
         """
 
         motor = self.__MOTORS[name]
@@ -543,10 +488,10 @@ class ActiveNeck:
             self.__limit_status[name]['upper'] = True
 
     # # Public methods:
-    # NOTE: By default all new class methods should be private.
+
     def main_loop(self):
         """
-        
+        In a loop, once the intialization was successfull, it checks the axis limits and publish the current motors positions to the PIDs controllers.
         """
 
         self.__check_initialization()
@@ -554,8 +499,6 @@ class ActiveNeck:
         if not self.__is_initialized:
             return
 
-        # NOTE: Add code (function calls), which has to be executed once the
-        # node was successfully initialized.
         self.__check_axis_limits(
             'pitch',
             self.__current_position_deg['pitch'],
@@ -576,17 +519,10 @@ class ActiveNeck:
 
     def node_shutdown(self):
         """
-        
+        Disable the motor's torque, closes the port and shut the node down.
         """
 
         rospy.loginfo_once(f'{self.__NODE_NAME}: node is shutting down...',)
-
-        # NOTE: Add code, which needs to be executed on nodes' shutdown here.
-        # Publishing to topics is not guaranteed, use service calls or
-        # set parameters instead.
-
-        # NOTE: Placing a service call inside of a try-except block here causes
-        # the node to stuck.
 
         self.__port_is_ready = False
 
@@ -610,7 +546,7 @@ class ActiveNeck:
 
 def main():
     """
-    
+    Initialize the active_neck node with its frquency, initialize an ActiveNeck object, sets the rate and shuts down.
     """
 
     # # Default node initialization.
