@@ -57,10 +57,10 @@ To operate the system, launch the following nodes:
 3. **`udp_ros` node**:
    - Transmits the camera stream to Unity.
 
-4. **Unity ROS node**:
+4.  **`unity_ros` node**:
    - Facilitates communication with Unity over TCP/IP.
   
-5. **Oculus ROS node**:
+5.  **`oculus_ros` node**
 - Receive the headset pose and converts it into the correct input for PIDs.
 
 ---
