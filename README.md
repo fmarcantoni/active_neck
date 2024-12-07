@@ -47,20 +47,20 @@ The integration with Unity includes communication for reading and converting the
 ## Launch Instructions
 To operate the system, launch the following nodes:
 
-1. **`active_neck.launch`**:
-   - Starts the active neck script.
-   - Launches the two PIDs for motor control.
-
-2. **RealSense camera node**:
+1. **RealSense camera node**: **`roslaunch realsense2_camera rs_camera.launch color_width:=640 color_height:=480 color_fps:=30`**
    - Handles image streaming from the camera.
+    
+2.  **`unity_ros` node**: **`roslaunch unity_ros endpoint.launch`**
+   - Facilitates communication with Unity over TCP/IP.
 
-3. **`udp_ros` node**:
+3. **`udp_ros` node**: **`roslaunch udp_ros udp_streamer.launch enable_imshow:=true udp_ip:=130.215.15.105 udp_port:=8082 fps_rate:=30`**
    - Transmits the camera stream to Unity.
 
-4.  **`unity_ros` node**:
-   - Facilitates communication with Unity over TCP/IP.
+4. **`active_neck.launch`**: **`roslaunch active_neck active_neck.launch`**
+   - Starts the active neck script.
+   - Launches the two PIDs for motor control.
   
-5.  **`oculus_ros` node**
+5.  **`oculus_ros` node**: **`roslaunch oculus_ros headset_feedback.launch`**
 - Receive the headset pose and converts it into the correct input for PIDs.
 
 ---
